@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="表情對決：看表情、搶拍正確種類，限時反應連擊加速的節奏反應小遊戲。"
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='82'%3E🎯%3C/text%3E%3C/svg%3E"
+    />
+    <title>表情對決</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <p class="eyebrow">節奏反應 · 表情對決</p>
+        <h1>表情對決</h1>
+        <p class="tagline">看表情、搶拍正確種類，連擊加速</p>
+      </header>
+
+      <section class="meter" aria-label="對局狀態">
+        <div class="meter-item">
+          <span class="label">分數</span>
+          <strong id="score">0</strong>
+        </div>
+        <div class="meter-item">
+          <span class="label">combo</span>
+          <strong id="combo">0 combo</strong>
+        </div>
+        <div class="meter-item highlight">
+          <span class="label">最高分</span>
+          <strong id="best-label">—</strong>
+        </div>
+      </section>
+
+      <div class="controls">
+        <button type="button" id="btn-new">開始</button>
+        <button type="button" id="btn-mute" class="secondary" aria-pressed="true">音效開</button>
+      </div>
+
+      <p id="status" class="status" role="status">準備…</p>
+
+      <section class="play" aria-label="出題區">
+        <div class="hud">
+          <span class="chip big" id="score-chip">0</span>
+          <span class="chip" id="combo-chip">0 combo</span>
+        </div>
+        <div class="timebar-track" aria-hidden="true">
+          <div id="timebar" class="timebar-fill"></div>
+        </div>
+        <div id="emote" class="stage" aria-live="polite"></div>
+        <div id="options" class="options"></div>
+      </section>
+
+      <section id="end-panel" class="end-panel hidden" aria-live="polite">
+        <h2 id="end-title">本局結束</h2>
+        <p class="end-score" id="end-score">0 分</p>
+        <p class="end-sub">最高 combo：<span id="end-best">0</span></p>
+        <button type="button" id="btn-again">再玩一次</button>
+      </section>
+
+      <details class="rules">
+        <summary>規則</summary>
+        <ul>
+          <li>畫面中央出現一個表情，判斷它屬於哪一種：<b>笑／哭／怒／驚</b>。</li>
+          <li>在<b>限時內</b>點選正確種類；答錯或超時就結束本局。</li>
+          <li>連續答對 combo 越高，倒數越快、單題分數越高。</li>
+          <li>分數會記錄最高紀錄（若無伺服端 KV，不影響遊玩）。</li>
+        </ul>
+      </details>
+
+      <p class="attribution">
+        美術：Emotes Pack · Kenney.nl（CC0）；語音：Voiceover Pack · Kenney.nl（CC0）
+      </p>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
