@@ -6,78 +6,124 @@
     <meta name="color-scheme" content="dark" />
     <meta
       name="description"
-      content="表情對決：看表情、搶拍正確種類，限時反應連擊加速的節奏反應小遊戲。"
+      content="表情對決：每回合抽一條規則，限時把場上所有符合的表情點完；點錯或超時扣命，連擊會讓倒數更快。"
     />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='82'%3E🎯%3C/text%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='82'%3E😄%3C/text%3E%3C/svg%3E"
     />
     <title>表情對決</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main>
-      <header class="hero">
-        <p class="eyebrow">節奏反應 · 表情對決</p>
-        <h1>表情對決</h1>
-        <p class="tagline">看表情、搶拍正確種類，連擊加速</p>
+    <main class="app">
+      <header class="top">
+        <div class="brand">
+          <p class="eyebrow">限時反應</p>
+          <h1>表情對決</h1>
+        </div>
+        <div class="top-actions">
+          <button type="button" id="btn-restart" class="icon-btn" title="重新開始">↺</button>
+          <button
+            type="button"
+            id="btn-sound"
+            class="icon-btn"
+            aria-pressed="true"
+            title="音效開關"
+          >
+            🔊
+          </button>
+        </div>
       </header>
 
-      <section class="meter" aria-label="對局狀態">
-        <div class="meter-item">
-          <span class="label">分數</span>
-          <strong id="score">0</strong>
+      <div id="confirm-bar" class="confirm-bar" hidden>
+        <span>放棄這一局，重新開始？</span>
+        <div class="confirm-actions">
+          <button type="button" id="confirm-yes" class="danger">重新開始</button>
+          <button type="button" id="confirm-no" class="ghost">繼續玩</button>
         </div>
-        <div class="meter-item">
-          <span class="label">combo</span>
-          <strong id="combo">0 combo</strong>
-        </div>
-        <div class="meter-item highlight">
-          <span class="label">最高分</span>
-          <strong id="best-label">—</strong>
-        </div>
-      </section>
-
-      <div class="controls">
-        <button type="button" id="btn-new">開始</button>
-        <button type="button" id="btn-mute" class="secondary" aria-pressed="true">音效開</button>
       </div>
 
-      <p id="status" class="status" role="status">準備…</p>
-
-      <section class="play" aria-label="出題區">
-        <div class="hud">
-          <span class="chip big" id="score-chip">0</span>
-          <span class="chip" id="combo-chip">0 combo</span>
+      <section class="stats" aria-label="對局狀態">
+        <div class="stat">
+          <span class="k">關卡</span><strong id="stat-level">1-1</strong>
         </div>
-        <div class="timebar-track" aria-hidden="true">
-          <div id="timebar" class="timebar-fill"></div>
+        <div class="stat">
+          <span class="k">分數</span><strong id="stat-score">0</strong>
         </div>
-        <div id="emote" class="stage" aria-live="polite"></div>
-        <div id="options" class="options"></div>
+        <div class="stat">
+          <span class="k">連擊</span><strong id="stat-combo">0</strong>
+        </div>
+        <div class="stat">
+          <span class="k">生命</span><strong id="stat-lives" class="lives">♥♥♥</strong>
+        </div>
       </section>
 
-      <section id="end-panel" class="end-panel hidden" aria-live="polite">
-        <h2 id="end-title">本局結束</h2>
-        <p class="end-score" id="end-score">0 分</p>
-        <p class="end-sub">最高 combo：<span id="end-best">0</span></p>
-        <button type="button" id="btn-again">再玩一次</button>
+      <section class="rule-card" aria-live="polite">
+        <span class="rule-badge" id="rule-badge" aria-hidden="true">😄</span>
+        <p class="rule-text" id="rule-text">按「開始遊戲」出題</p>
+        <span class="rule-left" id="rule-left"></span>
       </section>
 
-      <details class="rules">
-        <summary>規則</summary>
+      <div class="timer">
+        <div
+          id="timebar"
+          class="timebar"
+          role="progressbar"
+          aria-label="本回合剩餘時間"
+          aria-valuemin="0"
+          aria-valuemax="0"
+          aria-valuenow="0"
+        >
+          <div id="timefill" class="timefill"></div>
+        </div>
+        <output id="time-text" class="time-text" aria-live="off">—</output>
+      </div>
+
+      <section id="board" class="board" aria-label="表情場地"></section>
+
+      <p id="flash" class="flash" role="status">&nbsp;</p>
+
+      <section class="progress-wrap" aria-label="通關進度">
+        <div class="progress"><div id="progress-fill" class="progress-fill"></div></div>
+        <p class="progress-label">
+          <span>進度 <b id="progress-text">0 / 24</b></span>
+          <span>最高分 <b id="best">—</b></span>
+        </p>
+      </section>
+
+      <details class="guide">
+        <summary>玩法與分類對照</summary>
         <ul>
-          <li>畫面中央出現一個表情，判斷它屬於哪一種：<b>笑／哭／怒／驚</b>。</li>
-          <li>在<b>限時內</b>點選正確種類；答錯或超時就結束本局。</li>
-          <li>連續答對 combo 越高，倒數越快、單題分數越高。</li>
-          <li>分數會記錄最高紀錄（若無伺服端 KV，不影響遊玩）。</li>
+          <li>每回合抽一條規則，例如「點所有<b>開心</b>的」「點所有<b>不是藍色</b>的」。</li>
+          <li>在倒數結束前把<b>所有</b>符合規則的表情點完就過關；場上一定同時有正解與誘餌。</li>
+          <li>點到不符規則的、或時間到還沒點完 → <b>扣一命並重打本回合</b>；三條命用完就結束。</li>
+          <li>連續過關累積<b>連擊</b>：分數加權，倒數也會越來越短。</li>
+          <li>八關、每關三回合，全部打完就通關。</li>
         </ul>
+        <p class="guide-sub">心情分類</p>
+        <ul class="legend" id="legend-mood"></ul>
+        <p class="guide-sub">顏色分類</p>
+        <ul class="legend" id="legend-color"></ul>
       </details>
 
-      <p class="attribution">
-        美術：Emotes Pack · Kenney.nl（CC0）；語音：Voiceover Pack · Kenney.nl（CC0）
+      <p class="credit">
+        美術 Emotes Pack、音效 Digital Audio／Interface Sounds、語音 Voiceover Pack — 皆為
+        <a href="https://kenney.nl" rel="noopener">Kenney</a>（CC0）。詳見 ATTRIBUTION.md。
       </p>
     </main>
+
+    <div id="overlay" class="overlay">
+      <div class="panel" role="dialog" aria-modal="true" aria-labelledby="ov-title">
+        <p class="ov-eyebrow" id="ov-eyebrow">限時反應</p>
+        <h2 id="ov-title">表情對決</h2>
+        <p class="ov-body" id="ov-body">
+          看清楚規則，把場上所有符合的表情點完。點錯或超時會扣命。
+        </p>
+        <ul class="ov-stats" id="ov-stats" hidden></ul>
+        <button type="button" id="ov-action" class="primary">開始遊戲</button>
+      </div>
+    </div>
 
     <script type="module" src="./app.js"></script>
   </body>

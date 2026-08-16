@@ -18,10 +18,16 @@
 | 資源 | Pack | 作者 | URL |
 | --- | --- | --- | --- |
 | 語音提示 correct／game_over／new_highscore／ready／hurry_up／congratulations（.ogg） | Voiceover Pack | Kenney Vleugels | https://kenney.nl/assets/voiceover-pack |
-| 按鈕／答對／答錯／combo／win | Web Audio 合成 | 本專案 | — |
+| 點擊／combo／過關／升關／勝負／倒數（.ogg） | Digital Audio | Kenney Vleugels | https://kenney.nl/assets/digital-audio |
+| 按鈕／開始／失誤／超時（.ogg） | Interface Sounds | Kenney Vleugels | https://kenney.nl/assets/interface-sounds |
+| 取樣無法載入時的備援音 | Web Audio 合成 | 本專案 | — |
 
-**授權：** Voiceover Pack 為 CC0；合成音效為本專案自製。
-拷貝時附上 pack 的 `License.txt`（見 `assets/voice/License.txt`）。
+**授權：** 三個 Kenney 音訊 pack 均為 CC0；合成備援音為本專案自製。
+各 pack 的授權檔已一併保留：
+
+- `assets/voice/License.txt`
+- `assets/sfx/License-digital-audio.txt`
+- `assets/sfx/License-interface-sounds.txt`
 
 ---
 

@@ -1,132 +1,155 @@
 /**
- * 表情對決 — Web Audio 合成音效（無第三方取樣）。
- * 語音提示（correct 等）使用拷入的 assets/voice/*.ogg。
+ * 表情對決 — 音效層。
+ *
+ * 以 Web Audio 播放實際取樣（Kenney CC0 的 .ogg，見 ATTRIBUTION.md）：
+ * 點擊、失誤、超時、過關、升關、勝負，加上關鍵時刻的語音提示。
+ * 瀏覽器不支援 ogg 解碼時，退回同名的合成音，遊戲照常有聲。
  */
-export class ReacttapAudio {
+
+const SFX = {
+  hit1: "assets/sfx/hit1.ogg",
+  hit2: "assets/sfx/hit2.ogg",
+  hit3: "assets/sfx/hit3.ogg",
+  hit4: "assets/sfx/hit4.ogg",
+  hit5: "assets/sfx/hit5.ogg",
+  miss: "assets/sfx/miss.ogg",
+  timeout: "assets/sfx/timeout.ogg",
+  clear: "assets/sfx/clear.ogg",
+  levelup: "assets/sfx/levelup.ogg",
+  win: "assets/sfx/win.ogg",
+  lose: "assets/sfx/lose.ogg",
+  tick: "assets/sfx/tick.ogg",
+  start: "assets/sfx/start.ogg",
+  ui: "assets/sfx/ui.ogg",
+};
+
+const VOICE = {
+  ready: "assets/voice/ready.ogg",
+  correct: "assets/voice/correct.ogg",
+  hurry_up: "assets/voice/hurry_up.ogg",
+  game_over: "assets/voice/game_over.ogg",
+  congratulations: "assets/voice/congratulations.ogg",
+  new_highscore: "assets/voice/new_highscore.ogg",
+};
+
+/** 取樣載入失敗時的替身：用振盪器合成近似的音。 */
+const FALLBACK = {
+  hit1: { freq: 660, dur: 0.09, type: "triangle" },
+  hit2: { freq: 740, dur: 0.09, type: "triangle" },
+  hit3: { freq: 830, dur: 0.09, type: "triangle" },
+  hit4: { freq: 990, dur: 0.09, type: "triangle" },
+  hit5: { freq: 1170, dur: 0.09, type: "triangle" },
+  miss: { freq: 165, dur: 0.22, type: "sawtooth" },
+  timeout: { freq: 130, dur: 0.3, type: "square" },
+  clear: { freq: 880, dur: 0.16, type: "sine", up: 1.5 },
+  levelup: { freq: 700, dur: 0.2, type: "sine", up: 2 },
+  win: { freq: 523, dur: 0.24, type: "sine", up: 2 },
+  lose: { freq: 200, dur: 0.4, type: "sawtooth", up: 0.5 },
+  tick: { freq: 1200, dur: 0.04, type: "square", gain: 0.5 },
+  start: { freq: 523, dur: 0.12, type: "sine", up: 1.5 },
+  ui: { freq: 420, dur: 0.05, type: "triangle", gain: 0.6 },
+};
+
+export class GameAudio {
   constructor() {
     this.ctx = null;
     this.enabled = true;
-    this.master = 0.22;
-    this._voices = {};
+    this.master = 0.5;
+    this.buffers = new Map();
+    this.loading = null;
   }
 
-  ensure() {
-    if (!this.ctx) {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC) this.ctx = new AC();
-    }
-  }
-
+  /** 使用者手勢後呼叫：建立／恢復 AudioContext 並開始載入取樣。 */
   async unlock() {
-    this.ensure();
-    if (this.ctx?.state === "suspended") await this.ctx.resume();
+    if (!this.ctx) {
+      const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
+      if (!AC) return;
+      this.ctx = new AC();
+      this.gain = this.ctx.createGain();
+      this.gain.gain.value = this.master;
+      this.gain.connect(this.ctx.destination);
+    }
+    if (this.ctx.state === "suspended") {
+      try {
+        await this.ctx.resume();
+      } catch {
+        /* 使用者尚未互動 */
+      }
+    }
+    return this.preload();
+  }
+
+  /** 背景載入全部取樣；個別失敗不影響其他音。 */
+  preload() {
+    if (this.loading) return this.loading;
+    const all = { ...SFX, ...VOICE };
+    this.loading = Promise.all(
+      Object.entries(all).map(([name, url]) => this.#load(name, url)),
+    ).then(() => this.buffers.size);
+    return this.loading;
+  }
+
+  async #load(name, url) {
+    if (!this.ctx || this.buffers.has(name)) return;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const raw = await res.arrayBuffer();
+      const decoded = await this.ctx.decodeAudioData(raw);
+      this.buffers.set(name, decoded);
+    } catch {
+      /* 缺檔或瀏覽器不支援 ogg → 用合成音替代 */
+    }
   }
 
   setEnabled(on) {
-    this.enabled = on;
+    this.enabled = !!on;
+    if (this.gain) this.gain.gain.value = this.enabled ? this.master : 0;
   }
 
-  /** 載入語音 ogg 供提示播放（失敗不影響遊戲）。 */
-  async loadVoice(name, url) {
-    if (!window.fetch) return;
-    const audio = this._voices[name];
-    if (audio) return audio;
-    try {
-      const res = await fetch(url);
-      const buf = await res.arrayBuffer();
-      this.ensure();
-      if (!this.ctx) return null;
-      const decoded = await this.ctx.decodeAudioData(buf);
-      this._voices[name] = decoded;
-      return decoded;
-    } catch {
-      return null;
+  /** 播一個音；rate 可微調音高（combo 上升時用）。 */
+  play(name, { rate = 1, gain = 1 } = {}) {
+    if (!this.enabled || !this.ctx) return;
+    if (this.ctx.state === "suspended") void this.ctx.resume();
+    const buffer = this.buffers.get(name);
+    if (!buffer) {
+      this.#synth(name, gain);
+      return;
     }
-  }
-
-  playVoice(name) {
-    if (!this.enabled) return;
-    this.ensure();
-    const ctx = this.ctx;
-    const buffer = this._voices[name];
-    if (!ctx || !buffer) return;
-    const src = ctx.createBufferSource();
+    const src = this.ctx.createBufferSource();
     src.buffer = buffer;
-    const g = ctx.createGain();
-    g.gain.value = 0.9;
+    src.playbackRate.value = rate;
+    const g = this.ctx.createGain();
+    g.gain.value = gain;
     src.connect(g);
-    g.connect(ctx.destination);
+    g.connect(this.gain);
     src.start();
   }
 
-  tone(freq, dur, type = "sine", gain = 0.12, when = 0) {
-    if (!this.enabled) return;
-    this.ensure();
-    const ctx = this.ctx;
-    if (!ctx) return;
-    if (ctx.state === "suspended") void ctx.resume();
-    const t0 = ctx.currentTime + when;
-    const osc = ctx.createOscillator();
-    const g = ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, t0);
+  /** 點中目標：combo 越高音越亮。 */
+  hit(combo = 0) {
+    const step = Math.min(4, Math.floor(combo / 2));
+    this.play(`hit${step + 1}`, { rate: 1 + Math.min(0.35, combo * 0.01) });
+  }
+
+  #synth(name, gain = 1) {
+    const spec = FALLBACK[name];
+    if (!spec || !this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = spec.type;
+    osc.frequency.setValueAtTime(spec.freq, t0);
+    if (spec.up) {
+      osc.frequency.exponentialRampToValueAtTime(spec.freq * spec.up, t0 + spec.dur);
+    }
+    const peak = 0.22 * gain * (spec.gain ?? 1);
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(gain * this.master, t0 + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + Math.max(0.04, dur));
+    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + spec.dur);
     osc.connect(g);
-    g.connect(ctx.destination);
+    g.connect(this.gain);
     osc.start(t0);
-    osc.stop(t0 + dur + 0.03);
-  }
-
-  noise(dur, gain = 0.3, when = 0) {
-    if (!this.enabled) return;
-    this.ensure();
-    const ctx = this.ctx;
-    if (!ctx) return;
-    const t0 = ctx.currentTime + when;
-    const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(gain * this.master, t0);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    src.connect(g);
-    g.connect(ctx.destination);
-    src.start(t0);
-  }
-
-  select() {
-    this.tone(260, 0.05, "triangle", 0.1);
-    this.noise(0.03, 0.15);
-  }
-
-  good() {
-    // 上揚雙音
-    this.tone(523, 0.08, "sine", 0.14);
-    this.tone(784, 0.12, "sine", 0.14, 0.06);
-  }
-
-  combo() {
-    const base = 660 + Math.min(400, this._lastCombo * 30);
-    this.tone(base, 0.09, "triangle", 0.12);
-    this.tone(base * 1.5, 0.1, "triangle", 0.1, 0.05);
-  }
-
-  tick() {
-    this.tone(880, 0.04, "square", 0.06);
-  }
-
-  wrong() {
-    this.tone(180, 0.18, "sawtooth", 0.12);
-    this.tone(140, 0.2, "square", 0.1, 0.08);
-  }
-
-  win() {
-    const seq = [523, 659, 784, 1047, 1319];
-    seq.forEach((f, i) => this.tone(f, 0.16, "sine", 0.14, i * 0.11));
+    osc.stop(t0 + spec.dur + 0.05);
   }
 }
